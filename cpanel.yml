@@ -1,6 +1,6 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/biderne1/quotation.bidernet.co.il
-    - /usr/bin/rsync -a --exclude='.git' --exclude='.gitignore' --exclude='.cpanel.yml' --exclude='config.php' --exclude='uploads/' --exclude='.htaccess' ./ "$DEPLOYPATH/"
+    - export DEPLOYPATH=/home/biderne1/public_html/quotation.bidernet.co.il
+    - /usr/bin/rsync -a --exclude='.git' --exclude='.gitignore' --exclude='.cpanel.yml' --exclude='cpanel.yml' --exclude='config.php' --exclude='install.php' --exclude='.htaccess' --exclude='*.md' ./ "$DEPLOYPATH/"
     - /bin/chmod 755 "$DEPLOYPATH"
