@@ -1,0 +1,8 @@
+# הגדרות עם סיסמאות — נוצר בשרת מ-config.sample.php, לא עולה ל-GitHub
+/config.php
+
+# זבל מערכת
+.DS_Store
+Thumbs.db
+*.log
+*~
