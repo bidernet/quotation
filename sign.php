@@ -9,23 +9,21 @@ $token = preg_replace('/[^a-f0-9]/', '', $_GET['t'] ?? '');
 if ($token === '') { http_response_code(404); die('קישור לא תקין.'); }
 $st = $pdo->prepare("SELECT * FROM quotes WHERE public_token=?"); $st->execute([$token]); $q=$st->fetch();
 if (!$q) { http_response_code(404); die('המסמך לא נמצא.'); }
-
-/* --- רישום צפייה + התראה לבעל העסק (פעם אחת) --- */
-if ($q['status'] !== 'signed' && empty($q['viewed_at'])) {
-    $pdo->prepare("UPDATE quotes SET viewed_at=NOW(), status=IF(status='draft','sent',status) WHERE id=?")->execute([$q['id']]);
-    $q['viewed_at'] = date('Y-m-d H:i:s');
-    notify_owner_view($pdo, $q);
-}
-
 $its=$pdo->prepare("SELECT * FROM quote_items WHERE quote_id=? ORDER BY sort_order"); $its->execute([$q['id']]); $items=$its->fetchAll();
 
-/* --- קבלת חתימה --- */
+// מעקב צפייה + התראה (רק בטעינת עמוד, לא ב-POST)
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' && in_array($q['status'], ['draft','sent'], true)) {
+    $pdo->prepare("UPDATE quotes SET status='viewed', viewed_at=NOW() WHERE id=? AND status<>'signed'")->execute([$q['id']]);
+    notify_owner('👁 ' . ($q['client_name'] ?: 'לקוח') . ' צפה ב' . doc_label($q));
+    $q['status'] = 'viewed';
+}
+
 if ($_SERVER['REQUEST_METHOD']==='POST' && $q['mode']==='order' && $q['status']!=='signed') {
     $sig=$_POST['signature']??''; $name=trim($_POST['signer_name']??'');
     if (strpos($sig,'data:image/')===0 && strlen($sig)<2000000) {
         $pdo->prepare("UPDATE quotes SET status='signed', signature_data=?, signer_name=?, signed_at=NOW() WHERE id=?")->execute([$sig,$name,$q['id']]);
+        notify_owner('✍️ ' . ($name ?: ($q['client_name'] ?: 'לקוח')) . ' חתם על ' . doc_label($q) . '!');
         $st->execute([$token]); $q=$st->fetch();
-        notify_owner_sign($pdo, $q);
     }
 }
 $isOrder=($q['mode']==='order'); $signed=($q['status']==='signed');

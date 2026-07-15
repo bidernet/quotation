@@ -13,19 +13,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id=(int)($_POST['id']??0);
     $client=trim($_POST['client_name']??''); $phone=trim($_POST['phone']??'');
     $heading=trim($_POST['heading']??''); $date=$_POST['quote_date']?:date('Y-m-d');
-    $validity=max(0,(int)($_POST['validity']??10)); $doc_no=(int)($_POST['doc_no']??0);
+    $notes=trim($_POST['notes']??'');
+    $validity=max(0,(int)($_POST['validity']??10));
     $mode=($_POST['mode']??'quote')==='order'?'order':'quote';
-    $notes=trim($_POST['internal_notes']??'');
-    $nv=isset($_POST['notify_view'])?1:0; $ns=isset($_POST['notify_sign'])?1:0;
     $items=json_decode($_POST['items_json']??'[]',true); if(!is_array($items))$items=[];
     if ($id>0) {
-        $pdo->prepare("UPDATE quotes SET doc_no=?,client_name=?,phone=?,heading=?,quote_date=?,validity=?,mode=?,internal_notes=?,notify_view=?,notify_sign=? WHERE id=?")
-            ->execute([$doc_no,$client,$phone,$heading,$date,$validity,$mode,$notes,$nv,$ns,$id]);
+        $cur=(int)$pdo->query("SELECT doc_no FROM quotes WHERE id=".(int)$id)->fetchColumn();
+        $doc_no=reconcile_doc_no($pdo,$cur,$mode);
+        $pdo->prepare("UPDATE quotes SET doc_no=?,client_name=?,phone=?,heading=?,quote_date=?,validity=?,mode=?,notes=? WHERE id=?")
+            ->execute([$doc_no,$client,$phone,$heading,$date,$validity,$mode,$notes,$id]);
     } else {
-        if(!$doc_no)$doc_no=(int)$pdo->query("SELECT COALESCE(MAX(doc_no),0)+1 FROM quotes")->fetchColumn();
+        $doc_no=next_doc_no($pdo,$mode);
         $tok=quote_make_token();
-        $pdo->prepare("INSERT INTO quotes (doc_no,client_name,phone,heading,quote_date,validity,mode,status,public_token,internal_notes,notify_view,notify_sign) VALUES (?,?,?,?,?,?,?, 'draft', ?,?,?,?)")
-            ->execute([$doc_no,$client,$phone,$heading,$date,$validity,$mode,$tok,$notes,$nv,$ns]);
+        $pdo->prepare("INSERT INTO quotes (doc_no,client_name,phone,heading,quote_date,validity,mode,status,notes,public_token) VALUES (?,?,?,?,?,?,?, 'draft', ?, ?)")
+            ->execute([$doc_no,$client,$phone,$heading,$date,$validity,$mode,$notes,$tok]);
         $id=(int)$pdo->lastInsertId();
     }
     $pdo->prepare("DELETE FROM quote_items WHERE quote_id=?")->execute([$id]);
@@ -34,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     flash('ההצעה נשמרה.'); header('Location: quote_form.php?id='.$id); exit;
 }
 
-$q=['id'=>0,'doc_no'=>'','client_name'=>'','phone'=>'','heading'=>'פרסום סושיאל מדיה','quote_date'=>date('Y-m-d'),'validity'=>10,'mode'=>'quote','status'=>'draft','public_token'=>'','internal_notes'=>'','notify_view'=>1,'notify_sign'=>1];
+$q=['id'=>0,'doc_no'=>'','client_name'=>'','phone'=>'','heading'=>'פרסום סושיאל מדיה','quote_date'=>date('Y-m-d'),'validity'=>10,'mode'=>'quote','status'=>'draft','notes'=>'','public_token'=>''];
 $items=[];
 if ($id>0) {
     $st=$pdo->prepare("SELECT * FROM quotes WHERE id=?"); $st->execute([$id]); $f=$st->fetch();
@@ -43,26 +44,21 @@ if ($id>0) {
     $its=$pdo->prepare("SELECT * FROM quote_items WHERE quote_id=? ORDER BY sort_order"); $its->execute([$id]);
     foreach($its->fetchAll() as $r) $items[]=['catId'=>null,'name'=>$r['name'],'descr'=>$r['descr'],'fmt'=>$r['fmt'],'price'=>(float)$r['price'],'qty'=>(int)$r['qty']];
 }
-if(!$q['doc_no']) $q['doc_no']=(int)$pdo->query("SELECT COALESCE(MAX(doc_no),0)+1 FROM quotes")->fetchColumn();
 $catalog=$pdo->query("SELECT id,name,descr,fmt,price FROM quote_services ORDER BY created_at DESC")->fetchAll();
-$statusInfo = quote_status_info($q);
 
-page_head('הצעת מחיר', 'quotes');
+page_head('הצעת מחיר', 'index');
 ?>
 <div class="pagebar">
-  <a class="btn btn-ghost btn-sm" href="quotes.php">→ חזרה</a>
-  <?php if ($id): ?><span class="badge <?= $statusInfo['class'] ?>"><?= e($statusInfo['label']) ?></span><?php endif; ?>
-  <div class="spacer"></div>
+  <a class="btn btn-ghost btn-sm" href="index.php">→ חזרה</a><div class="spacer"></div>
   <?php if ($id): ?>
     <a class="btn btn-ghost btn-sm" href="quote_view.php?id=<?= $id ?>" target="_blank">👁 צפה כלקוח</a>
-    <a class="btn btn-ghost btn-sm" href="pdf.php?id=<?= $id ?>" target="_blank">📄 PDF</a>
     <?php if (greenapi_enabled() && $q['phone']): ?>
       <form method="post" action="send.php" style="display:inline" onsubmit="return confirm('לשלוח בוואטסאפ אל <?= e($q['phone']) ?>?')"><?= csrf_field() ?><input type="hidden" name="quote_id" value="<?= $id ?>"><button class="btn btn-green btn-sm" type="submit">💬 שלח בוואטסאפ</button></form>
     <?php endif; ?>
   <?php endif; ?>
 </div>
 
-<?php if ($id && !greenapi_enabled()): ?><div class="alert warn">כדי לשלוח בוואטסאפ ולקבל התראות יש לחבר את GREEN API ב<a href="settings.php">הגדרות</a>.</div><?php endif; ?>
+<?php if ($id && !greenapi_enabled()): ?><div class="alert warn">כדי לשלוח בוואטסאפ יש לחבר את GREEN API ב<a href="settings.php">הגדרות</a>.</div><?php endif; ?>
 
 <form method="post" id="qform">
   <?= csrf_field() ?>
@@ -77,11 +73,11 @@ page_head('הצעת מחיר', 'quotes');
       <div class="field"><label>טלפון (בלי 972)</label><input type="text" name="phone" value="<?= e($q['phone']) ?>" placeholder="0501234567"></div>
       <div class="field"><label>כותרת עמוד המחירים</label><input type="text" name="heading" value="<?= e($q['heading']) ?>" placeholder="למשל: פרסום סושיאל מדיה"></div>
       <div class="field"><label>תאריך</label><input type="date" name="quote_date" value="<?= e($q['quote_date']) ?>"></div>
-      <div class="field"><label>מספר מסמך</label><input type="number" name="doc_no" value="<?= (int)$q['doc_no'] ?>"></div>
+      <div class="field"><label>מספר מסמך</label><input type="text" value="<?= $q['doc_no'] ? e(doc_label($q)) : 'יוקצה אוטומטית בשמירה' ?>" disabled style="background:#f5f7f9"></div>
       <div class="field"><label>תוקף (ימי עסקים)</label><input type="number" name="validity" value="<?= (int)$q['validity'] ?>">
-        <?php $exp=quote_expiry_date($q); if($exp): ?><div class="hint">פג תוקף בתאריך <?= $exp->format('d/m/Y') ?></div><?php endif; ?>
-      </div>
+      <?php if (!empty($q['quote_date']) && (int)$q['validity']>0): $exp=quote_expiry_date($q); ?><div class="hint" style="<?= quote_is_expired($q)?'color:#b02620':'' ?>">⏰ <?= quote_is_expired($q)?'פג תוקף ב-':'תקף עד ' ?><?= fmt_date($exp) ?></div><?php endif; ?></div>
     </div>
+    <div class="field"><label>הערות פנימיות (הלקוח לא רואה)</label><textarea name="notes" placeholder="למשל: הלקוח ביקש הנחה, לחזור אליו ביום ראשון..."><?= e($q['notes']??'') ?></textarea></div>
   </div>
 
   <div class="card">
@@ -93,16 +89,6 @@ page_head('הצעת מחיר', 'quotes');
     <table class="tot"><tr><td>סכום ביניים</td><td class="tl" id="t_sub"></td></tr><tr><td class="muted">מע״מ 17%</td><td class="tl muted" id="t_vat"></td></tr><tr class="big"><td>סה״כ</td><td class="tl" id="t_total"></td></tr></table>
   </div>
 
-  <div class="card">
-    <h2>📌 הערות פנימיות ותזכורות</h2>
-    <div class="field"><textarea name="internal_notes" placeholder="הערות שרק אתה רואה — לא מופיעות בהצעה ללקוח."><?= e($q['internal_notes']??'') ?></textarea></div>
-    <div class="rowflex" style="justify-content:flex-start;gap:20px;margin-top:6px">
-      <label style="display:flex;align-items:center;gap:8px;font-weight:600;margin:0"><input type="checkbox" name="notify_view" style="width:18px;height:18px" <?= !empty($q['notify_view'])?'checked':'' ?>> 🔔 התראת וואטסאפ כשהלקוח צופה</label>
-      <label style="display:flex;align-items:center;gap:8px;font-weight:600;margin:0"><input type="checkbox" name="notify_sign" style="width:18px;height:18px" <?= !empty($q['notify_sign'])?'checked':'' ?>> ✅ התראת וואטסאפ כשהלקוח חותם</label>
-    </div>
-    <div class="hint">ההתראות נשלחות למספר בעל העסק שמוגדר ב<a href="settings.php">הגדרות</a>.</div>
-  </div>
-
   <div class="card center"><button class="btn" type="submit" onclick="return prep()">💾 שמור הצעה</button></div>
 </form>
 
@@ -110,7 +96,7 @@ page_head('הצעת מחיר', 'quotes');
 const CATALOG = <?= json_encode($catalog, JSON_UNESCAPED_UNICODE) ?>.map(c=>({id:+c.id,name:c.name,descr:c.descr||'',fmt:c.fmt||'bullets',price:+c.price}));
 let items = <?= json_encode($items, JSON_UNESCAPED_UNICODE) ?>;
 let mode = <?= json_encode($q['mode']) ?>;
-const VAT=<?= json_encode(VAT_RATE) ?>;
+const VAT=0.17;
 function esc(s){return(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function money(n){return '₪'+Number(n||0).toLocaleString('he-IL',{maximumFractionDigits:0});}
 function isSel(id){return items.some(i=>i.catId===id);}
