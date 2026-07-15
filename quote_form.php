@@ -13,17 +13,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id=(int)($_POST['id']??0);
     $client=trim($_POST['client_name']??''); $phone=trim($_POST['phone']??'');
     $heading=trim($_POST['heading']??''); $date=$_POST['quote_date']?:date('Y-m-d');
-    $validity=max(0,(int)($_POST['validity']??10)); $doc_no=(int)($_POST['doc_no']??0);
+    $notes=trim($_POST['notes']??'');
+    $validity=max(0,(int)($_POST['validity']??10));
     $mode=($_POST['mode']??'quote')==='order'?'order':'quote';
     $items=json_decode($_POST['items_json']??'[]',true); if(!is_array($items))$items=[];
     if ($id>0) {
-        $pdo->prepare("UPDATE quotes SET doc_no=?,client_name=?,phone=?,heading=?,quote_date=?,validity=?,mode=? WHERE id=?")
-            ->execute([$doc_no,$client,$phone,$heading,$date,$validity,$mode,$id]);
+        $cur=(int)$pdo->query("SELECT doc_no FROM quotes WHERE id=".(int)$id)->fetchColumn();
+        $doc_no=reconcile_doc_no($pdo,$cur,$mode);
+        $pdo->prepare("UPDATE quotes SET doc_no=?,client_name=?,phone=?,heading=?,quote_date=?,validity=?,mode=?,notes=? WHERE id=?")
+            ->execute([$doc_no,$client,$phone,$heading,$date,$validity,$mode,$notes,$id]);
     } else {
-        if(!$doc_no)$doc_no=(int)$pdo->query("SELECT COALESCE(MAX(doc_no),0)+1 FROM quotes")->fetchColumn();
+        $doc_no=next_doc_no($pdo,$mode);
         $tok=quote_make_token();
-        $pdo->prepare("INSERT INTO quotes (doc_no,client_name,phone,heading,quote_date,validity,mode,status,public_token) VALUES (?,?,?,?,?,?,?, 'draft', ?)")
-            ->execute([$doc_no,$client,$phone,$heading,$date,$validity,$mode,$tok]);
+        $pdo->prepare("INSERT INTO quotes (doc_no,client_name,phone,heading,quote_date,validity,mode,status,notes,public_token) VALUES (?,?,?,?,?,?,?, 'draft', ?, ?)")
+            ->execute([$doc_no,$client,$phone,$heading,$date,$validity,$mode,$notes,$tok]);
         $id=(int)$pdo->lastInsertId();
     }
     $pdo->prepare("DELETE FROM quote_items WHERE quote_id=?")->execute([$id]);
@@ -32,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     flash('ההצעה נשמרה.'); header('Location: quote_form.php?id='.$id); exit;
 }
 
-$q=['id'=>0,'doc_no'=>'','client_name'=>'','phone'=>'','heading'=>'פרסום סושיאל מדיה','quote_date'=>date('Y-m-d'),'validity'=>10,'mode'=>'quote','status'=>'draft','public_token'=>''];
+$q=['id'=>0,'doc_no'=>'','client_name'=>'','phone'=>'','heading'=>'פרסום סושיאל מדיה','quote_date'=>date('Y-m-d'),'validity'=>10,'mode'=>'quote','status'=>'draft','notes'=>'','public_token'=>''];
 $items=[];
 if ($id>0) {
     $st=$pdo->prepare("SELECT * FROM quotes WHERE id=?"); $st->execute([$id]); $f=$st->fetch();
@@ -41,7 +44,6 @@ if ($id>0) {
     $its=$pdo->prepare("SELECT * FROM quote_items WHERE quote_id=? ORDER BY sort_order"); $its->execute([$id]);
     foreach($its->fetchAll() as $r) $items[]=['catId'=>null,'name'=>$r['name'],'descr'=>$r['descr'],'fmt'=>$r['fmt'],'price'=>(float)$r['price'],'qty'=>(int)$r['qty']];
 }
-if(!$q['doc_no']) $q['doc_no']=(int)$pdo->query("SELECT COALESCE(MAX(doc_no),0)+1 FROM quotes")->fetchColumn();
 $catalog=$pdo->query("SELECT id,name,descr,fmt,price FROM quote_services ORDER BY created_at DESC")->fetchAll();
 
 page_head('הצעת מחיר', 'index');
@@ -71,9 +73,11 @@ page_head('הצעת מחיר', 'index');
       <div class="field"><label>טלפון (בלי 972)</label><input type="text" name="phone" value="<?= e($q['phone']) ?>" placeholder="0501234567"></div>
       <div class="field"><label>כותרת עמוד המחירים</label><input type="text" name="heading" value="<?= e($q['heading']) ?>" placeholder="למשל: פרסום סושיאל מדיה"></div>
       <div class="field"><label>תאריך</label><input type="date" name="quote_date" value="<?= e($q['quote_date']) ?>"></div>
-      <div class="field"><label>מספר מסמך</label><input type="number" name="doc_no" value="<?= (int)$q['doc_no'] ?>"></div>
-      <div class="field"><label>תוקף (ימי עסקים)</label><input type="number" name="validity" value="<?= (int)$q['validity'] ?>"></div>
+      <div class="field"><label>מספר מסמך</label><input type="text" value="<?= $q['doc_no'] ? e(doc_label($q)) : 'יוקצה אוטומטית בשמירה' ?>" disabled style="background:#f5f7f9"></div>
+      <div class="field"><label>תוקף (ימי עסקים)</label><input type="number" name="validity" value="<?= (int)$q['validity'] ?>">
+      <?php if (!empty($q['quote_date']) && (int)$q['validity']>0): $exp=quote_expiry_date($q); ?><div class="hint" style="<?= quote_is_expired($q)?'color:#b02620':'' ?>">⏰ <?= quote_is_expired($q)?'פג תוקף ב-':'תקף עד ' ?><?= fmt_date($exp) ?></div><?php endif; ?></div>
     </div>
+    <div class="field"><label>הערות פנימיות (הלקוח לא רואה)</label><textarea name="notes" placeholder="למשל: הלקוח ביקש הנחה, לחזור אליו ביום ראשון..."><?= e($q['notes']??'') ?></textarea></div>
   </div>
 
   <div class="card">

@@ -15,6 +15,19 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         setting_set($pdo,'greenapi_token',trim($_POST['greenapi_token']??''));
         flash('ההגדרות נשמרו.'); header('Location: settings.php'); exit;
     }
+    if ($act==='numbering') {
+        $qs=(int)($_POST['quote_start']??1001); if($qs<=0)$qs=1001;
+        $os=(int)($_POST['order_start']??5001); if($os<=0)$os=5001;
+        setting_set($pdo,'quote_start',(string)$qs);
+        setting_set($pdo,'order_start',(string)$os);
+        flash('הגדרות המספור נשמרו. (חל על מסמכים חדשים)');
+        header('Location: settings.php'); exit;
+    }
+    if ($act==='notify') {
+        setting_set($pdo,'owner_phone',trim($_POST['owner_phone']??''));
+        flash('הגדרות ההתראות נשמרו.');
+        header('Location: settings.php'); exit;
+    }
     if ($act==='test') {
         $phone=trim($_POST['test_phone']??'');
         if($phone===''){ $notice='הזן מספר לבדיקה.'; }
@@ -22,10 +35,36 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     }
 }
 $cfg=greenapi_cfg(); $connected=greenapi_enabled();
+$quote_start=(int)setting_get($pdo,'quote_start','1001');
+$order_start=(int)setting_get($pdo,'order_start','5001');
+$owner_phone=setting_get($pdo,'owner_phone','');
 page_head('הגדרות','settings');
 ?>
 <div class="pagebar"><h1>הגדרות</h1></div>
 <?php if ($notice): ?><div class="alert <?= strpos($notice,'נכשל')!==false?'err':'ok' ?>"><?= e($notice) ?></div><?php endif; ?>
+
+<div class="card">
+  <h2>מספור מסמכים</h2>
+  <div class="muted" style="font-size:13px;margin-bottom:12px">הצעות מחיר והזמנות עבודה ממוספרות בסדרות נפרדות. כאן מגדירים מאיזה מספר להתחיל (חל על מסמכים חדשים בלבד).</div>
+  <form method="post">
+    <?= csrf_field() ?><input type="hidden" name="action" value="numbering">
+    <div class="grid2">
+      <div class="field"><label>הצעות מחיר — מספר התחלה</label><input type="number" name="quote_start" value="<?= $quote_start ?>"></div>
+      <div class="field"><label>הזמנות עבודה — מספר התחלה</label><input type="number" name="order_start" value="<?= $order_start ?>"></div>
+    </div>
+    <div class="actions"><button class="btn" type="submit">שמור מספור</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>התראות</h2>
+  <div class="muted" style="font-size:13px;margin-bottom:12px">קבל הודעת וואטסאפ כשלקוח צופה או חותם על מסמך. (דורש חיבור GREEN API פעיל)</div>
+  <form method="post">
+    <?= csrf_field() ?><input type="hidden" name="action" value="notify">
+    <div class="grid2"><div class="field"><label>הטלפון שלך לקבלת התראות</label><input type="text" name="owner_phone" value="<?= e($owner_phone) ?>" placeholder="0541234567"></div></div>
+    <div class="actions"><button class="btn" type="submit">שמור</button></div>
+  </form>
+</div>
 
 <div class="card">
   <h2>חיבור וואטסאפ · GREEN API</h2>

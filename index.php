@@ -7,26 +7,45 @@ $pdo = db();
 ensure_schema($pdo);
 
 $tab = (($_GET['tab'] ?? '') === 'signed') ? 'signed' : 'open';
-$where = $tab === 'signed' ? "status='signed'" : "status<>'signed'";
-$order = $tab === 'signed' ? "signed_at DESC" : "created_at DESC";
-$rows = $pdo->query("SELECT q.*, (SELECT COALESCE(SUM(price*qty),0) FROM quote_items qi WHERE qi.quote_id=q.id) AS sub
-                     FROM quotes q WHERE $where ORDER BY $order")->fetchAll();
+$search = trim($_GET['q'] ?? '');
+$active = ($tab === 'signed' && $search === '') ? 'signed' : 'index';
+
+$params = [];
+if ($search !== '') {
+    // חיפוש גלובלי לפי מספר / שם / טלפון (מתעלם מהלשונית)
+    $cond = "(client_name LIKE ? OR phone LIKE ? OR doc_no LIKE ?)";
+    $like = '%' . $search . '%';
+    $params = [$like, $like, $like];
+    $order = "created_at DESC";
+    $rows = $pdo->prepare("SELECT q.*, (SELECT COALESCE(SUM(price*qty),0) FROM quote_items qi WHERE qi.quote_id=q.id) AS sub
+                           FROM quotes q WHERE $cond ORDER BY $order");
+    $rows->execute($params);
+    $rows = $rows->fetchAll();
+} else {
+    $where = $tab === 'signed' ? "status='signed'" : "status<>'signed'";
+    $order = $tab === 'signed' ? "signed_at DESC" : "created_at DESC";
+    $rows = $pdo->query("SELECT q.*, (SELECT COALESCE(SUM(price*qty),0) FROM quote_items qi WHERE qi.quote_id=q.id) AS sub
+                         FROM quotes q WHERE $where ORDER BY $order")->fetchAll();
+}
 $open_cnt   = (int)$pdo->query("SELECT COUNT(*) FROM quotes WHERE status<>'signed'")->fetchColumn();
 $signed_cnt = (int)$pdo->query("SELECT COUNT(*) FROM quotes WHERE status='signed'")->fetchColumn();
 
-page_head('הצעות מחיר', 'index');
+page_head($tab==='signed' && $search===''?'הזמנות חתומות':'הצעות מחיר', $active);
 ?>
 <div class="pagebar">
-  <h1>הצעות מחיר</h1>
+  <h1><?= $tab==='signed' && $search===''?'הזמנות חתומות':'הצעות מחיר' ?></h1>
   <div class="spacer"></div>
-  <a class="btn btn-ghost" href="catalog.php">📚 קטלוג שירותים</a>
+  <form method="get" class="searchbox">
+    <span class="s-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#6b7472" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></span>
+    <input type="text" name="q" value="<?= e($search) ?>" placeholder="חיפוש לפי מספר / שם / טלפון">
+    <?php if ($search!==''): ?><a class="btn btn-ghost btn-sm" href="index.php">✕</a><?php endif; ?>
+  </form>
   <a class="btn" href="quote_form.php">+ הצעה חדשה</a>
 </div>
 
-<div class="subtabs">
-  <a class="tab <?= $tab==='open'?'on':'' ?>" href="index.php?tab=open">📝 הצעות מחיר (<?= $open_cnt ?>)</a>
-  <a class="tab <?= $tab==='signed'?'on':'' ?>" href="index.php?tab=signed">✅ הזמנות חתומות (<?= $signed_cnt ?>)</a>
-</div>
+<?php if ($search!==''): ?>
+<div class="subtabs"><span class="muted" style="padding:9px 4px">תוצאות חיפוש עבור "<?= e($search) ?>" (<?= count($rows) ?>)</span></div>
+<?php endif; ?>
 
 <div class="card">
 <?php if (!$rows): ?>
@@ -42,11 +61,10 @@ page_head('הצעות מחיר', 'index');
     <tbody>
     <?php foreach ($rows as $q):
       $total = (float)$q['sub'] * (1 + VAT_RATE);
-      $badge = $q['status']==='signed' ? '<span class="badge green">חתום</span>'
-             : ($q['mode']==='order' ? '<span class="badge amber">הזמנת עבודה</span>' : '<span class="badge gray">הצעה</span>');
+      $badge = quote_status_badge($q);
     ?>
       <tr>
-        <td><a class="link" href="quote_form.php?id=<?= (int)$q['id'] ?>">#<?= (int)$q['doc_no'] ?> · <?= e($q['client_name'] ?: '—') ?></a></td>
+        <td><a class="link" href="quote_form.php?id=<?= (int)$q['id'] ?>"><?= e(doc_label($q)) ?> · <?= e($q['client_name'] ?: '—') ?></a></td>
         <td><?= $badge ?></td>
         <td class="nowrap"><?= fmt_date($q['quote_date']) ?></td>
         <?php if ($tab==='signed'): ?><td class="nowrap muted"><?= $q['signed_at']?fmt_date($q['signed_at']):'—' ?></td><?php endif; ?>
@@ -54,6 +72,7 @@ page_head('הצעות מחיר', 'index');
         <td class="tl nowrap">
           <a class="btn btn-ghost btn-sm" href="quote_view.php?id=<?= (int)$q['id'] ?>" target="_blank">צפייה</a>
           <a class="btn btn-ghost btn-sm" href="quote_form.php?id=<?= (int)$q['id'] ?>">עריכה</a>
+          <form method="post" action="duplicate.php" style="display:inline" onsubmit="return confirm('לשכפל את המסמך?')"><?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$q['id'] ?>"><button class="btn btn-ghost btn-sm" type="submit" title="שכפל">⧉ שכפל</button></form>
         </td>
       </tr>
     <?php endforeach; ?>

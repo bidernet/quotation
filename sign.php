@@ -11,10 +11,18 @@ $st = $pdo->prepare("SELECT * FROM quotes WHERE public_token=?"); $st->execute([
 if (!$q) { http_response_code(404); die('המסמך לא נמצא.'); }
 $its=$pdo->prepare("SELECT * FROM quote_items WHERE quote_id=? ORDER BY sort_order"); $its->execute([$q['id']]); $items=$its->fetchAll();
 
+// מעקב צפייה + התראה (רק בטעינת עמוד, לא ב-POST)
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' && in_array($q['status'], ['draft','sent'], true)) {
+    $pdo->prepare("UPDATE quotes SET status='viewed', viewed_at=NOW() WHERE id=? AND status<>'signed'")->execute([$q['id']]);
+    notify_owner('👁 ' . ($q['client_name'] ?: 'לקוח') . ' צפה ב' . doc_label($q));
+    $q['status'] = 'viewed';
+}
+
 if ($_SERVER['REQUEST_METHOD']==='POST' && $q['mode']==='order' && $q['status']!=='signed') {
     $sig=$_POST['signature']??''; $name=trim($_POST['signer_name']??'');
     if (strpos($sig,'data:image/')===0 && strlen($sig)<2000000) {
         $pdo->prepare("UPDATE quotes SET status='signed', signature_data=?, signer_name=?, signed_at=NOW() WHERE id=?")->execute([$sig,$name,$q['id']]);
+        notify_owner('✍️ ' . ($name ?: ($q['client_name'] ?: 'לקוח')) . ' חתם על ' . doc_label($q) . '!');
         $st->execute([$token]); $q=$st->fetch();
     }
 }
