@@ -38,7 +38,7 @@ $services = $pdo->query("SELECT * FROM quote_services ORDER BY created_at DESC")
 page_head('קטלוג שירותים', 'catalog');
 ?>
 <div class="pagebar"><h1>קטלוג שירותים</h1><div class="spacer"></div>
-  <?php if (!$showForm): ?><a class="btn" href="catalog.php?new=1">+ שירות חדש</a><?php endif; ?>
+  <?php if (!$showForm): ?><a class="btn" href="catalog.php?new=1"><?= icon('plus') ?> שירות חדש</a><?php endif; ?>
 </div>
 <?php if ($error): ?><div class="alert err"><?= e($error) ?></div><?php endif; ?>
 

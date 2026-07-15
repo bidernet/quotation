@@ -29,7 +29,7 @@ $recent = $pdo->query("SELECT * FROM quotes ORDER BY GREATEST(COALESCE(signed_at
 $active = 'dashboard';
 page_head('דשבורד', 'dashboard');
 ?>
-<div class="pagebar"><h1>דשבורד</h1><div class="spacer"></div><a class="btn" href="quote_form.php">+ הצעה חדשה</a></div>
+<div class="pagebar"><h1>דשבורד</h1><div class="spacer"></div><a class="btn" href="quote_form.php"><?= icon('plus') ?> הצעה חדשה</a></div>
 
 <div class="kpis">
   <div class="kpi"><div class="lbl">הצעות פתוחות</div><div class="val"><?= $open_cnt ?></div><div class="sub">ממתינות לתגובה</div></div>
@@ -43,11 +43,11 @@ page_head('דשבורד', 'dashboard');
   <?php if (!$recent): ?>
     <div class="muted">אין עדיין פעילות. <a href="quote_form.php">צור הצעה ראשונה</a>.</div>
   <?php else: foreach ($recent as $q):
-    if ($q['status'] === 'signed' && $q['signed_at']) { $ic='✍️'; $txt='<b>'.e($q['client_name']).'</b> חתם על '.e(doc_label($q)); $when=$q['signed_at']; }
-    elseif ($q['status'] === 'viewed' && $q['viewed_at']) { $ic='👁'; $txt='<b>'.e($q['client_name']).'</b> צפה ב'.e(doc_label($q)); $when=$q['viewed_at']; }
-    elseif (quote_is_expired($q)) { $ic='⏰'; $txt=e(doc_label($q)).' · <b>'.e($q['client_name']).'</b> פג תוקף'; $when=quote_expiry_date($q); }
-    elseif ($q['status'] === 'sent') { $ic='📤'; $txt='נשלחה '.e(doc_label($q)).' ל<b>'.e($q['client_name']).'</b>'; $when=$q['created_at']; }
-    else { $ic='📝'; $txt='נוצרה '.e(doc_label($q)).' · <b>'.e($q['client_name']).'</b>'; $when=$q['created_at']; }
+    if ($q['status'] === 'signed' && $q['signed_at']) { $ic=icon('check'); $txt='<b>'.e($q['client_name']).'</b> חתם על '.e(doc_label($q)); $when=$q['signed_at']; }
+    elseif ($q['status'] === 'viewed' && $q['viewed_at']) { $ic=icon('eye'); $txt='<b>'.e($q['client_name']).'</b> צפה ב'.e(doc_label($q)); $when=$q['viewed_at']; }
+    elseif (quote_is_expired($q)) { $ic=icon('clock'); $txt=e(doc_label($q)).' · <b>'.e($q['client_name']).'</b> פג תוקף'; $when=quote_expiry_date($q); }
+    elseif ($q['status'] === 'sent') { $ic=icon('send'); $txt='נשלחה '.e(doc_label($q)).' ל<b>'.e($q['client_name']).'</b>'; $when=$q['created_at']; }
+    else { $ic=icon('doc'); $txt='נוצרה '.e(doc_label($q)).' · <b>'.e($q['client_name']).'</b>'; $when=$q['created_at']; }
   ?>
     <div class="actrow"><span><?= $ic ?> <?= $txt ?></span><span class="muted"><?= fmt_date($when) ?></span></div>
   <?php endforeach; endif; ?>

@@ -49,14 +49,18 @@ $catalog=$pdo->query("SELECT id,name,descr,fmt,price FROM quote_services ORDER B
 page_head('הצעת מחיר', 'index');
 ?>
 <div class="pagebar">
-  <a class="btn btn-ghost btn-sm" href="index.php">→ חזרה</a><div class="spacer"></div>
-  <?php if ($id): ?>
-    <a class="btn btn-ghost btn-sm" href="quote_view.php?id=<?= $id ?>" target="_blank">👁 צפה כלקוח</a>
+  <a class="btn btn-ghost btn-sm" href="index.php"><?= icon('back') ?> חזרה</a><div class="spacer"></div>
+  <?php if ($id): $signLink = $q['public_token'] ? rtrim(APP_URL,'/').'/sign.php?t='.$q['public_token'] : ''; ?>
+    <a class="btn btn-ghost btn-sm" href="quote_view.php?id=<?= $id ?>" target="_blank"><?= icon('eye') ?> צפה כלקוח</a>
     <?php if (greenapi_enabled() && $q['phone']): ?>
-      <form method="post" action="send.php" style="display:inline" onsubmit="return confirm('לשלוח בוואטסאפ אל <?= e($q['phone']) ?>?')"><?= csrf_field() ?><input type="hidden" name="quote_id" value="<?= $id ?>"><button class="btn btn-green btn-sm" type="submit">💬 שלח בוואטסאפ</button></form>
+      <form method="post" action="send.php" style="display:inline" onsubmit="return confirm('לשלוח בוואטסאפ אל <?= e($q['phone']) ?>?')"><?= csrf_field() ?><input type="hidden" name="quote_id" value="<?= $id ?>"><button class="btn btn-green btn-sm" type="submit"><?= icon('send') ?> שלח בוואטסאפ</button></form>
     <?php endif; ?>
+    <?php if ($signLink): ?><button type="button" class="btn btn-ghost btn-sm" onclick="copyLink()"><?= icon('link') ?> העתק קישור</button><?php endif; ?>
+    <form method="post" action="duplicate.php" style="display:inline" onsubmit="return confirm('לשכפל את המסמך?')"><?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn-ghost btn-sm" type="submit"><?= icon('copy') ?> שכפל</button></form>
+    <form method="post" action="delete.php" style="display:inline" onsubmit="return confirm('למחוק לצמיתות?')"><?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn-red btn-sm" type="submit"><?= icon('trash') ?> מחק</button></form>
   <?php endif; ?>
 </div>
+<?php if (!empty($signLink)): ?><input type="hidden" id="signLinkVal" value="<?= e($signLink) ?>"><?php endif; ?>
 
 <?php if ($id && !greenapi_enabled()): ?><div class="alert warn">כדי לשלוח בוואטסאפ יש לחבר את GREEN API ב<a href="settings.php">הגדרות</a>.</div><?php endif; ?>
 
@@ -75,7 +79,7 @@ page_head('הצעת מחיר', 'index');
       <div class="field"><label>תאריך</label><input type="date" name="quote_date" value="<?= e($q['quote_date']) ?>"></div>
       <div class="field"><label>מספר מסמך</label><input type="text" value="<?= $q['doc_no'] ? e(doc_label($q)) : 'יוקצה אוטומטית בשמירה' ?>" disabled style="background:#f5f7f9"></div>
       <div class="field"><label>תוקף (ימי עסקים)</label><input type="number" name="validity" value="<?= (int)$q['validity'] ?>">
-      <?php if (!empty($q['quote_date']) && (int)$q['validity']>0): $exp=quote_expiry_date($q); ?><div class="hint" style="<?= quote_is_expired($q)?'color:#b02620':'' ?>">⏰ <?= quote_is_expired($q)?'פג תוקף ב-':'תקף עד ' ?><?= fmt_date($exp) ?></div><?php endif; ?></div>
+      <?php if (!empty($q['quote_date']) && (int)$q['validity']>0): $exp=quote_expiry_date($q); ?><div class="hint" style="<?= quote_is_expired($q)?'color:#b02620':'' ?>"><?= quote_is_expired($q)?'פג תוקף ב-':'תקף עד ' ?><?= fmt_date($exp) ?></div><?php endif; ?></div>
     </div>
     <div class="field"><label>הערות פנימיות (הלקוח לא רואה)</label><textarea name="notes" placeholder="למשל: הלקוח ביקש הנחה, לחזור אליו ביום ראשון..."><?= e($q['notes']??'') ?></textarea></div>
   </div>
@@ -89,7 +93,7 @@ page_head('הצעת מחיר', 'index');
     <table class="tot"><tr><td>סכום ביניים</td><td class="tl" id="t_sub"></td></tr><tr><td class="muted">מע״מ 17%</td><td class="tl muted" id="t_vat"></td></tr><tr class="big"><td>סה״כ</td><td class="tl" id="t_total"></td></tr></table>
   </div>
 
-  <div class="card center"><button class="btn" type="submit" onclick="return prep()">💾 שמור הצעה</button></div>
+  <div class="card center"><button class="btn" type="submit" onclick="return prep()"><?= icon('save') ?> שמור הצעה</button></div>
 </form>
 
 <script>
@@ -103,7 +107,7 @@ function isSel(id){return items.some(i=>i.catId===id);}
 function sub(){return items.reduce((s,i)=>s+(+i.price)*(i.qty||1),0);}
 function render(){
   document.getElementById('modeTitle').textContent=mode==='order'?'הזמנת עבודה':'הצעת מחיר';
-  document.getElementById('modeBtn').textContent=mode==='order'?'← חזור להצעה':'↔ הפוך להזמנת עבודה';
+  document.getElementById('modeBtn').textContent=mode==='order'?'חזור להצעה':'הפוך להזמנת עבודה';
   document.getElementById('f_mode').value=mode;
   const rows=CATALOG.map(c=>{const sel=isSel(c.id);const line=items.find(i=>i.catId===c.id);
     return `<div class="svc-row" style="${sel?'background:#fbfee9':''}"><div class="svc-info"><div style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" style="width:18px;height:18px;margin-top:3px" ${sel?'checked':''} onchange="tog(${c.id},this.checked)"><div style="flex:1"><strong>${esc(c.name)}</strong> <span class="badge gray">${c.fmt==='bullets'?'בולטים':'טקסט'}</span>${sel?`<textarea style="width:100%;min-height:66px;margin-top:8px" onchange="sd(${c.id},this.value)">${esc(line.descr)}</textarea>`:`<div class="muted" style="margin-top:6px;white-space:pre-wrap">${esc(c.descr)}</div>`}</div></div></div><div class="svc-act">${sel?`<input type="number" min="1" value="${line.qty}" style="width:56px" onchange="sq(${c.id},this.value)"><input type="number" value="${line.price}" style="width:96px" onchange="sp(${c.id},this.value)">`:`<span class="muted">${money(c.price)}</span>`}</div></div>`;}).join('');
@@ -121,6 +125,7 @@ function del(i){items.splice(i,1);render();}
 function addFree(){const n=document.getElementById('fn').value.trim();const p=+document.getElementById('fp').value||0;if(!n){alert('הזן תיאור');return;}items.push({catId:null,name:n,descr:'',fmt:'text',price:p,qty:1});document.getElementById('fn').value='';document.getElementById('fp').value='';render();}
 function toggleMode(){mode=mode==='order'?'quote':'order';render();}
 function prep(){document.getElementById('items_json').value=JSON.stringify(items);return true;}
+function copyLink(){var el=document.getElementById('signLinkVal');if(!el)return;var v=el.value;if(navigator.clipboard){navigator.clipboard.writeText(v);}else{var t=document.createElement('textarea');t.value=v;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);}alert('הקישור הועתק:\n'+v);}
 render();
 </script>
 <?php page_foot(); ?>

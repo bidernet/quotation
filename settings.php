@@ -28,6 +28,11 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         flash('הגדרות ההתראות נשמרו.');
         header('Location: settings.php'); exit;
     }
+    if ($act==='wa_template') {
+        setting_set($pdo,'wa_template',trim($_POST['wa_template']??''));
+        flash('תבנית הוואטסאפ נשמרה.');
+        header('Location: settings.php'); exit;
+    }
     if ($act==='test') {
         $phone=trim($_POST['test_phone']??'');
         if($phone===''){ $notice='הזן מספר לבדיקה.'; }
@@ -38,10 +43,21 @@ $cfg=greenapi_cfg(); $connected=greenapi_enabled();
 $quote_start=(int)setting_get($pdo,'quote_start','1001');
 $order_start=(int)setting_get($pdo,'order_start','5001');
 $owner_phone=setting_get($pdo,'owner_phone','');
+$wa_template=setting_get($pdo,'wa_template',''); if(trim($wa_template)==='') $wa_template=wa_template_default();
 page_head('הגדרות','settings');
 ?>
 <div class="pagebar"><h1>הגדרות</h1></div>
 <?php if ($notice): ?><div class="alert <?= strpos($notice,'נכשל')!==false?'err':'ok' ?>"><?= e($notice) ?></div><?php endif; ?>
+
+<div class="card">
+  <h2>תבנית הודעת וואטסאפ</h2>
+  <div class="muted" style="font-size:13px;margin-bottom:12px">הטקסט שיישלח ללקוח עם ההצעה. השתמש במשתנים <code style="background:#eef;padding:1px 6px;border-radius:4px;direction:ltr;display:inline-block">{שם}</code> ו-<code style="background:#eef;padding:1px 6px;border-radius:4px;direction:ltr;display:inline-block">{קישור}</code> — הם יוחלפו אוטומטית בשם הלקוח ובקישור לחתימה.</div>
+  <form method="post">
+    <?= csrf_field() ?><input type="hidden" name="action" value="wa_template">
+    <div class="field"><textarea name="wa_template" style="min-height:150px;line-height:1.7"><?= e($wa_template) ?></textarea></div>
+    <div class="actions"><button class="btn" type="submit">שמור תבנית</button></div>
+  </form>
+</div>
 
 <div class="card">
   <h2>מספור מסמכים</h2>

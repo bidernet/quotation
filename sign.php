@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && $q['mode']==='order' && $q['status']!
 $isOrder=($q['mode']==='order'); $signed=($q['status']==='signed');
 ?><!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($isOrder?'הזמנת עבודה':'הצעת מחיר') ?> · bidernet</title>
-<link rel="stylesheet" href="assets/style.css"></head><body class="docbg">
+<link rel="stylesheet" href="assets/style.css"><link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png"><link rel="shortcut icon" href="assets/favicon.ico"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><meta name="theme-color" content="#c6f02e"></head><body class="docbg">
 <?php include __DIR__ . '/lib/quote_document.php'; ?>
 
 <?php if ($isOrder): ?>
@@ -45,7 +45,7 @@ $isOrder=($q['mode']==='order'); $signed=($q['status']==='signed');
       <div class="muted" style="margin:8px 0">חתום כאן באצבע:</div>
       <canvas id="pad" class="sigpad"></canvas>
       <input type="hidden" name="signature" id="signature">
-      <div class="actions center"><button type="button" class="btn btn-ghost" onclick="clearPad()">נקה</button><button type="submit" class="btn">✍️ אני מאשר/ת וחותם/ת</button></div>
+      <div class="actions center"><button type="button" class="btn btn-ghost" onclick="clearPad()">נקה</button><button type="submit" class="btn">אני מאשר/ת וחותם/ת</button></div>
     </form>
   <?php endif; ?>
 </div>

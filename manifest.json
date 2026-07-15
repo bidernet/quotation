@@ -1,0 +1,17 @@
+{
+  "name": "bidernet · הצעות מחיר",
+  "short_name": "bidernet",
+  "description": "מערכת הצעות מחיר והזמנות עבודה של bidernet",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6f7",
+  "theme_color": "#c6f02e",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

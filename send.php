@@ -14,7 +14,7 @@ if(!$q){ flash('לא נמצא.'); header('Location: index.php'); exit; }
 if(empty($q['phone'])){ flash('לא הוזן טלפון.'); header('Location: '.$back); exit; }
 if(empty($q['public_token'])){ $tok=quote_make_token(); $pdo->prepare("UPDATE quotes SET public_token=? WHERE id=?")->execute([$tok,$id]); $q['public_token']=$tok; }
 $link=rtrim(APP_URL,'/').'/sign.php?t='.$q['public_token'];
-$res=greenapi_send_text($q['phone'], quote_reminder_text($q,$link));
+$res=greenapi_send_text($q['phone'], wa_build_message($q,$link));
 if(!empty($res['ok'])){ if($q['status']==='draft')$pdo->prepare("UPDATE quotes SET status='sent' WHERE id=?")->execute([$id]); flash('נשלח בוואטסאפ אל '.($q['client_name']?:$q['phone']).'.'); }
 else { flash('שליחה נכשלה: '.($res['error']??'שגיאה')); }
 header('Location: '.$back); exit;

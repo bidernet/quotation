@@ -36,11 +36,11 @@ page_head($tab==='signed' && $search===''?'הזמנות חתומות':'הצעו�
   <h1><?= $tab==='signed' && $search===''?'הזמנות חתומות':'הצעות מחיר' ?></h1>
   <div class="spacer"></div>
   <form method="get" class="searchbox">
-    <span class="s-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#6b7472" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></span>
+    <span class="s-ico"><?= icon('search', 18) ?></span>
     <input type="text" name="q" value="<?= e($search) ?>" placeholder="חיפוש לפי מספר / שם / טלפון">
     <?php if ($search!==''): ?><a class="btn btn-ghost btn-sm" href="index.php">✕</a><?php endif; ?>
   </form>
-  <a class="btn" href="quote_form.php">+ הצעה חדשה</a>
+  <a class="btn" href="quote_form.php"><?= icon('plus') ?> הצעה חדשה</a>
 </div>
 
 <?php if ($search!==''): ?>
@@ -66,13 +66,17 @@ page_head($tab==='signed' && $search===''?'הזמנות חתומות':'הצעו�
       <tr>
         <td><a class="link" href="quote_form.php?id=<?= (int)$q['id'] ?>"><?= e(doc_label($q)) ?> · <?= e($q['client_name'] ?: '—') ?></a></td>
         <td><?= $badge ?></td>
-        <td class="nowrap"><?= fmt_date($q['quote_date']) ?></td>
-        <?php if ($tab==='signed'): ?><td class="nowrap muted"><?= $q['signed_at']?fmt_date($q['signed_at']):'—' ?></td><?php endif; ?>
-        <td class="money"><?= money($total) ?></td>
+        <td class="nowrap" data-label="תאריך"><?= fmt_date($q['quote_date']) ?></td>
+        <?php if ($tab==='signed'): ?><td class="nowrap muted" data-label="נחתם"><?= $q['signed_at']?fmt_date($q['signed_at']):'—' ?></td><?php endif; ?>
+        <td class="money" data-label="סה״כ כולל מע״מ"><?= money($total) ?></td>
         <td class="tl nowrap">
-          <a class="btn btn-ghost btn-sm" href="quote_view.php?id=<?= (int)$q['id'] ?>" target="_blank">צפייה</a>
-          <a class="btn btn-ghost btn-sm" href="quote_form.php?id=<?= (int)$q['id'] ?>">עריכה</a>
-          <form method="post" action="duplicate.php" style="display:inline" onsubmit="return confirm('לשכפל את המסמך?')"><?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$q['id'] ?>"><button class="btn btn-ghost btn-sm" type="submit" title="שכפל">⧉ שכפל</button></form>
+          <a class="btn btn-ghost btn-sm" href="quote_view.php?id=<?= (int)$q['id'] ?>" target="_blank" title="צפייה"><?= icon('eye') ?></a>
+          <?php if (greenapi_enabled() && $q['phone']): ?>
+          <form method="post" action="send.php" style="display:inline" onsubmit="return confirm('לשלוח בוואטסאפ אל <?= e($q['phone']) ?>?')"><?= csrf_field() ?><input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>"><button class="btn btn-green btn-sm" type="submit" title="שלח בוואטסאפ"><?= icon('send') ?></button></form>
+          <?php endif; ?>
+          <a class="btn btn-ghost btn-sm" href="quote_form.php?id=<?= (int)$q['id'] ?>">ערוך</a>
+          <form method="post" action="duplicate.php" style="display:inline" onsubmit="return confirm('לשכפל את המסמך?')"><?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$q['id'] ?>"><button class="btn btn-ghost btn-sm" type="submit" title="שכפל"><?= icon('copy') ?></button></form>
+          <form method="post" action="delete.php" style="display:inline" onsubmit="return confirm('למחוק לצמיתות את <?= e(doc_label($q)) ?>?')"><?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$q['id'] ?>"><button class="btn btn-red btn-sm" type="submit" title="מחק"><?= icon('trash') ?></button></form>
         </td>
       </tr>
     <?php endforeach; ?>
