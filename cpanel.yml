@@ -1,6 +1,6 @@
 ---
 deployment:
   quotation:
-    - export DEPLOYPATH=/home/biderne1/quotation.bidernet.co.il
+    - export DEPLOYPATH=/home/biderne1/repositories/quotation
     - /usr/bin/rsync -a --exclude='.git' --exclude='.gitignore' --exclude='.cpanel.yml' --exclude='config.php' --exclude='uploads/' --exclude='.htaccess' ./ "$DEPLOYPATH/"
     - /bin/chmod 755 "$DEPLOYPATH"
